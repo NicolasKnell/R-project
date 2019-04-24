@@ -1,55 +1,104 @@
 ---
-title: "Cristiano career goals"
+title: "Cristiano Ronaldo's career goals"
 output: 
   html_document:
     code_folding: "hide"
+    toc: TRUE
     number_sections: TRUE
 ---
 
 ```{r setup, include=FALSE}
+#le sutup du R markdown avec les limportation des librairies et de la base de données
 knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 library(dplyr)
+library(DT)
+library(plotly)
+library(treemap)
+#library(d3treeR)
 data = read.csv("goals.csv", sep = ";")
 original = data;
 ```
 
 # Introduction
 
-pour le projet de Data Vizualisation, nous avons choisis comme jeu de données les buts marquées par Cristiano Ronaldo pendant sa carrière.
+  Pour le projet de Data Vizualisation, nous avons choisi comme jeu de données les buts marqués par Cristiano Ronaldo pendant toute sa carrière. Notre présentation consiste à montrer contre quelles équipes Cristiano Ronaldo a le plus marqué. 
 
 ## Source
 
-pour obtenir ces statistiques, on a extrait ces données du [ce site](https://www.transfermarkt.com/cristiano-ronaldo/alletore/spieler/8198/saison//verein/0/liga/0/wettbewerb//pos/0/trainer_id/0/minute/0/torart/0)
-le script python qui fait l'extraction se trouve dans le notebook [scrapGoals.ipynb](#) et le dataset resultant est [goals.csv](#)
+Pour obtenir ces statistiques, on a extrait ces données du site [transfermarkt](https://www.transfermarkt.com/cristiano-ronaldo/alletore/spieler/8198/saison//verein/0/liga/0/wettbewerb//pos/0/trainer_id/0/minute/0/torart/0)
+Le script python qui fait l'extraction se trouve dans le notebook [scrapGoals.ipynb](#) et le dataset resultant est [goals.csv](#) (tous ces documents se trouvent sur [ce GitHub](https://github.com/bigabdoo7/R-project))
 
-## Description 
+## Description des données 
 
-ce dataset contient cinq colonnes, ces colonnes sont:
+Le dataset correspond aux buts marqués par Cristiano Ronaldo depuis le début de sa carrière professionnelle en club. (Nous n'avons pas pris en compte les buts en sélection nationale)
+De plus, les équipes contre qui Ronaldo a joué sans jamais marquer ne sont pas représetés dans le dataset.
 
-* la competition
+Ce dataset contient cinq colonnes qui sont:
 
-* l'équipe de Cristiano
+* La competition
 
-* l'équipe adversaire
+* L'équipe de Cristiano Ronaldo
 
-* à domicile ou à l'éxterieur
+* L'équipe adversaire
 
-* le nombre des buts marquées dans le match.
+* A domicile ou à l'éxterieur
 
-voici l'apercu du jeu de données :
+* Le nombre des buts marquées dans le match.
+
+  **Voici un apercu du jeu de données :**
+Le tableau est interactif pour que vous puissiez afficher les informations qui vous conviennent
 ```{r echo=FALSE}
-library(DT)
+#Tableau interactif
 datatable(data, rownames = TRUE, filter="top", options=list(pageLength = 5, scrollX=T))
 ```
 
-# Nombre de buts par equipe
+# Nombre de buts marqués par Cristiano Ronaldo contre chaque adversaire
+
+Nous avons trié le dataset selon les équipes adverses afin d'avoir le compte des buts de Ronaldo par adversaire. Nous n'avons exclu aucun adversaire, même si certains n'ont joué contre l'équipe de Ronaldo qu'une seule fois. 
+Sont représentés ci-dessous le nombre de buts marqués par Cristiano Ronaldo contre chacun de ses adversaires.
+Il faut noter qu'il est normal que les équipes figurant en haut du graphe sont majoritairement espagnoles car Ronaldo a passé la majeure partie de sa carrière au Real Madrid.
+Nous avons choisi de présenter cette information sous forme de graphe lollipop pour la clarté de la lecture, le fait que nous comparons une variable numérique à une variable catégorique. Le graphe est bien sur trié pour améliorer la compréhension du lecteur.
+
+
 ```{r fig.height = 30, message=FALSE, warning=FALSE}
-library(plotly)
+# réorganisation des données en 3 colonnes: le nombre de buts contre chaque équipe, le nombre de matchs à domicile et le nombre de matchs à l'extérieur. 
 data<-data%>%
   group_by(against)%>%
   summarise( ng = sum(number.of.goals), a = sum(home.away=="A"), h = sum(home.away=="H") )
+
+# Tri en fonction du nombre de buts
 data<-data[order(data$ng, decreasing = FALSE), c(1,2,3,4)]
+
+#Création du graphe Lollipop
+p<-data%>%
+  mutate(against = factor(against, against))%>%
+  ggplot(aes(x = against, y = ng, text=paste("home:",h,"\naway:",a,"\n#goals:",ng), sort = FALSE))+
+    xlab("Adversaire")+ #axe vertical
+    ylab("nombre des buts")+ #axe horizontal
+    geom_segment( xend=1:nrow(data),  yend =1:nrow(data)*0)+ #méthode de contruction du lollipop
+    geom_point()+ #ajout du gros point au bout des segments
+    coord_flip() 
+ggplotly(p, tooltip = "text")
+```
+
+# Nombre de buts moyen marqués par Cristiano Ronaldo contre chaque adversaire
+
+Le nombre de buts marqués par adversaire n'étant pas toujours très pertinent (les adversaires n'ont pas toutes jouées le même nombre de matchs face à l'équipe de Ronaldo), nous avons décidé de présenter le nombre moyen de buts marqués par adversaire. Cette information permet de déterminer sur le long terme si Ronaldo avait tendance à plus marquer contre certains adversaires plutôt que d'autres. 
+Afin de ne pas fausser les statistiques avec des adversaires n'ayant joué que très peu de fois contre l'équipe de Ronaldo, nous avons décidé d'éliminer certains équipes de cette représentation. En effet, si Ronaldo marque 4 buts en un seul match face à une équipe qu'il n'a joué qu'une seule fois de sa carrière, cela ne donne que très peu d'information. 
+
+```{r fig.height = 10, message=FALSE, warning=FALSE}
+data = read.csv("goals.csv", sep = ";")
+original = data;
+
+#memes etapes que pour le premier graphe
+data<-data%>%
+  group_by(against)%>%
+  summarise( ng = sum(number.of.goals), a = sum(home.away=="A"), h = sum(home.away=="H")) %>%
+  filter(a+h>4) #on filtre sur les adversaires ayant joué au minimum 5 fois contre Ronaldo
+data$ng<- round(data$ng/(data$a+data$h),digits=2); #On transorme la colonne nombre de buts marqués en colonne moyenne des buts marqués
+data<-data[order(data$ng, decreasing = FALSE), c(1,2,3,4)]
+
 p<-data%>%
   mutate(against = factor(against, against))%>%
   ggplot(aes(x = against, y = ng, text=paste("home:",h,"\naway:",a,"\n#goals:",ng), sort = FALSE))+
@@ -63,14 +112,15 @@ ggplotly(p, tooltip = "text")
 
 # Nombre des buts par competition
 
+Nous avons aussi voulu représenter les buts marqués par Ronaldo en fonction de la compétition. Pour cela, nous avons choisi d'utiliser un Treemap permettant de facilement visualiser les compétititions prédominantes. 
+Lorque vous cliquez sur une compétition, vous pourrez voir les équipes avec lesquelles Ronaldo a marqué dans chaque compétition (en passant votre souris au dessus du nom de l'équipe).
+
 ```{r message=FALSE, warning=FALSE}
-library(treemap)
-library(d3treeR)
 data <- original
 p<- data%>%
   group_by(compitition, for.)%>%
   summarise(goals = sum(number.of.goals))%>%
   treemap(index =c("compitition", "for."),
           vSize = "goals", type = "index", draw = FALSE);
-d3tree3(p, rootname = "Goals per competition & team")
+#d3tree3(p, rootname = "Goals per competition & team")
 ```
