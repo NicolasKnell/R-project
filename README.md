@@ -1,5 +1,5 @@
 # Projet de DataViz - Buts de Cristiano Ronaldo
-Travail effectué par Nicolas KNELL et Abderrahman QOHAFA
+Travail effectué par Nicolas KNELL et Abderrahman QOHAFA pour le cours de DataViz à l'EMA (Ecole des Mines d'Alès)
 
 Lien vers le Gitgub: https://github.com/bigabdoo7/R-project
 
